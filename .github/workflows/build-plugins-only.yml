@@ -1,0 +1,167 @@
+name: Build Plugins Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'
+
+env:
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_BRANCH: openwrt-23.05
+  CONFIG_FILE: N1/.config
+  DIY_SH: N1/diy.sh
+  FILES: N1/files
+  TZ: Asia/Shanghai
+  GITHUB_TOKEN: ${{ secrets.TOKEN }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: 准备完成
+      uses: actions/checkout@main
+
+    - name: 清理磁盘空间
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
+
+    - name: 初始化编译环境
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo -E apt-get -qq update -y
+        sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/2410)
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
+
+    - name: 克隆源码
+      working-directory: /workdir
+      run: |
+        df -hT $PWD
+        git clone $REPO_URL -b $REPO_BRANCH --single-branch --depth=1 openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: 更新 & 安装 feeds
+      working-directory: ./openwrt
+      run: |
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: 加载自定义配置
+      run: |
+        [ -e $FILES ] && mv $FILES openwrt/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        chmod +x $DIY_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_SH
+
+    - name: SSH 连接到 Actions
+      uses: P3TERX/ssh2actions@main
+      if: (github.event.inputs.ssh == 'true') || contains(github.event.action, 'ssh')
+
+    - name: 下载软件包
+      working-directory: ./openwrt
+      run: |
+        make defconfig
+        make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    - name: 只编译插件
+      working-directory: ./openwrt
+      run: |
+        chmod -R 755 .
+        echo -e "$(nproc) thread compile"
+        # 只编译需要的包，不编译固件
+        make package/amlogic/compile -j$(nproc) || make package/amlogic/compile -j1 V=s
+        make package/linkease/compile -j$(nproc) || make package/linkease/compile -j1 V=s
+        make package/lucky/compile -j$(nproc) || make package/lucky/compile -j1 V=s
+        make package/floatip/compile -j$(nproc) || make package/floatip/compile -j1 V=s
+        make package/onliner/compile -j$(nproc) || make package/onliner/compile -j1 V=s
+        echo "compile_status=success" >> $GITHUB_ENV
+
+    - name: 打包编译输出
+      if: ${{ env.compile_status }} == 'success' && !cancelled()
+      run: |
+        cd openwrt
+        mkdir -p /tmp/plugin_packages
+        # 复制编译好的包文件
+        find bin/packages -name "*.ipk" -exec cp {} /tmp/plugin_packages/ \;
+        ls -la /tmp/plugin_packages/
+        
+        # 生成编译信息文件
+        cat > /tmp/plugin_packages/BUILD_INFO.txt << EOF
+编译时间: $(date +"%Y年%m月%d日%H时%M分")
+OpenWrt 版本: $REPO_BRANCH
+目标架构: armvirt
+包含的插件:
+- luci-app-amlogic (斐讯N1 Openwrt插件)
+- luci-app-linkease (易有云)
+- luci-app-lucky (幸运)
+- luci-app-floatip (浮动IP)
+- luci-app-onliner (在线用户)
+EOF
+        echo "package_status=success" >> $GITHUB_ENV
+
+    - name: 生成发布标签
+      if: ${{ env.package_status == 'success' }} && !cancelled()
+      run: |
+        echo "release_tag=$(date +"%Y.%m.%d-%H.%M")" >> ${GITHUB_OUTPUT}
+        touch release.txt
+        echo "
+        📦 插件编译成功
+          
+        💻 适用机型: 斐讯N1
+
+        📂 源码: ${{ env.REPO_URL }}
+
+        🌳 分支: ${{ env.REPO_BRANCH }}
+
+        ⏱️ 编译时间: $(date +"%Y年%m月%d日%H时%M分")
+
+        📋 包含的插件:
+        - luci-app-amlogic (斐讯N1 Openwrt插件)
+        - luci-app-linkease (易有云)
+        - luci-app-lucky (幸运)
+        - luci-app-floatip (浮动IP)
+        - luci-app-onliner (在线用户)
+        
+        " >> release.txt
+        echo "tag_status=success" >> $GITHUB_ENV
+
+    - name: 发布插件到 Releases
+      uses: softprops/action-gh-release@v2
+      if: ${{ env.tag_status == 'success' }} && !cancelled()
+      with:
+        tag_name: Plugins_${{ steps.tag.outputs.release_tag }}
+        files: /tmp/plugin_packages/*
+        body_path: release.txt
+        token: ${{ env.GITHUB_TOKEN }}
+
+    - name: 删除运行记录
+      uses: Mattraks/delete-workflow-runs@main
+      with:
+        retain_days: 1
+        keep_minimum_runs: 1
+        token: ${{ env.GITHUB_TOKEN }}
+
+    - name: 删除自动发布的旧插件
+      uses: dev-drprasad/delete-older-releases@master
+      if: !cancelled()
+      with:
+        keep_latest: 3
+        delete_tags: true
