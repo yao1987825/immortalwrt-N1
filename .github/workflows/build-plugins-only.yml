@@ -118,6 +118,7 @@ EOF
         echo "package_status=success" >> $GITHUB_ENV
 
     - name: 生成发布标签
+      id: tag
       if: ${{ env.package_status == 'success' && !cancelled() }}
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H.%M")" >> ${GITHUB_OUTPUT}
