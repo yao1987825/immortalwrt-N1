@@ -105,7 +105,7 @@ jobs:
         
         # 生成编译信息文件
         cat > /tmp/plugin_packages/BUILD_INFO.txt << EOF
-编译时间: $(date +"%Y年%m月%d日%H时%M分")
+编译时间: $(date +'%Y年%m月%d日%H时%M分')
 OpenWrt 版本: $REPO_BRANCH
 目标架构: armvirt
 包含的插件:
