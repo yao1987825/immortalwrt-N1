@@ -121,7 +121,7 @@ EOF
       id: tag
       if: ${{ env.package_status == 'success' && !cancelled() }}
       run: |
-        echo "release_tag=$(date +"%Y.%m.%d-%H.%M")" >> ${GITHUB_OUTPUT}
+        echo "release_tag=$(date +'%Y.%m.%d-%H.%M')" >> ${GITHUB_OUTPUT}
         touch release.txt
         echo "
         📦 插件编译成功
@@ -132,7 +132,7 @@ EOF
 
         🌳 分支: ${{ env.REPO_BRANCH }}
 
-        ⏱️ 编译时间: $(date +"%Y年%m月%d日%H时%M分")
+        ⏱️ 编译时间: $(date +'%Y年%m月%d日%H时%M分')
 
         📋 包含的插件:
         - luci-app-amlogic (斐讯N1 Openwrt插件)
