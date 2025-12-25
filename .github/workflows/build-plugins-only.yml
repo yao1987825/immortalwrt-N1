@@ -123,7 +123,7 @@ EOF
       run: |
         echo "release_tag=$(date +'%Y.%m.%d-%H.%M')" >> ${GITHUB_OUTPUT}
         touch release.txt
-        echo "
+        cat << 'RELEASE' >> release.txt
         📦 插件编译成功
           
         💻 适用机型: 斐讯N1
@@ -141,7 +141,7 @@ EOF
         - luci-app-floatip (浮动IP)
         - luci-app-onliner (在线用户)
         
-        " >> release.txt
+RELEASE
         echo "tag_status=success" >> $GITHUB_ENV
 
     - name: 发布插件到 Releases
