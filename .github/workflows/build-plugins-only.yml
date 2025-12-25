@@ -122,25 +122,23 @@ EOF
       if: ${{ env.package_status == 'success' && !cancelled() }}
       run: |
         echo "release_tag=$(date +'%Y.%m.%d-%H.%M')" >> ${GITHUB_OUTPUT}
-        touch release.txt
-        cat << 'RELEASE' >> release.txt
-        📦 插件编译成功
-          
-        💻 适用机型: 斐讯N1
+        cat > release.txt << 'RELEASE'
+📦 插件编译成功
 
-        📂 源码: ${{ env.REPO_URL }}
+💻 适用机型: 斐讯N1
 
-        🌳 分支: ${{ env.REPO_BRANCH }}
+📂 源码: ${{ env.REPO_URL }}
 
-        ⏱️ 编译时间: $(date +'%Y年%m月%d日%H时%M分')
+🌳 分支: ${{ env.REPO_BRANCH }}
 
-        📋 包含的插件:
-        - luci-app-amlogic (斐讯N1 Openwrt插件)
-        - luci-app-linkease (易有云)
-        - luci-app-lucky (幸运)
-        - luci-app-floatip (浮动IP)
-        - luci-app-onliner (在线用户)
-        
+⏱️ 编译时间: $(date +'%Y年%m月%d日%H时%M分')
+
+📋 包含的插件:
+- luci-app-amlogic (斐讯N1 Openwrt插件)
+- luci-app-linkease (易有云)
+- luci-app-lucky (幸运)
+- luci-app-floatip (浮动IP)
+- luci-app-onliner (在线用户)
 RELEASE
         echo "tag_status=success" >> $GITHUB_ENV
 
