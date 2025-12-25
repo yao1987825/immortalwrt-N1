@@ -95,7 +95,7 @@ jobs:
         echo "compile_status=success" >> $GITHUB_ENV
 
     - name: 打包编译输出
-      if: ${{ env.compile_status }} == 'success' && !cancelled()
+      if: ${{ env.compile_status == 'success' && !cancelled() }}
       run: |
         cd openwrt
         mkdir -p /tmp/plugin_packages
@@ -118,7 +118,7 @@ EOF
         echo "package_status=success" >> $GITHUB_ENV
 
     - name: 生成发布标签
-      if: ${{ env.package_status == 'success' }} && !cancelled()
+      if: ${{ env.package_status == 'success' && !cancelled() }}
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H.%M")" >> ${GITHUB_OUTPUT}
         touch release.txt
@@ -145,7 +145,7 @@ EOF
 
     - name: 发布插件到 Releases
       uses: softprops/action-gh-release@v2
-      if: ${{ env.tag_status == 'success' }} && !cancelled()
+      if: ${{ env.tag_status == 'success' && !cancelled() }}
       with:
         tag_name: Plugins_${{ steps.tag.outputs.release_tag }}
         files: /tmp/plugin_packages/*
